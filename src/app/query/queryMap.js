@@ -1,6 +1,6 @@
 const convert_vi_to_en = require('../../utils/vi_to_en')
 const replace_regexp = require('../../utils/replace_regexp')
-const join = require("./layerjoin")
+const join = require('./layerJoin')
 
 const getAddress = (address) => {
     switch (address) {
