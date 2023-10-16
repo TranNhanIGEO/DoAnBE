@@ -45,7 +45,7 @@ const MapController = {
             if (error) throw error
             const [getScore] = result.rows
             const minScore = getScore.min
-            if (score !== '0' && score < minScore) return res.status(200).json({type:'score', status: 'error', msg: `Điểm của bạn phải lớn hơn hoặc bằng ${minScore}`,  data: minScore})
+            if (score < minScore) return res.status(200).json({type:'score', status: 'error', msg: `Điểm của bạn phải lớn hơn hoặc bằng ${minScore}`,  data: minScore})
             
             pool.query(query.advisingEnrollment({layer, distance, score, longitude, latitude}), (error, result) => {
                 if (error) throw error

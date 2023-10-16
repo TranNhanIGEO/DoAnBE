@@ -1,6 +1,5 @@
 const convert_vi_to_en = require('../../utils/vi_to_en')
 const replace_regexp = require('../../utils/replace_regexp')
-const join = require('./layerJoin')
 
 const getAddress = (address) => {
     switch (address) {
@@ -20,99 +19,118 @@ const getAddress = (address) => {
 }
 const getMinScore = (layer) => {
     switch (layer) {
-        case 'diemchuan_truongchuyen_lopthuong':
+        case '00LTKC00':
             return `
-                SELECT MIN(nv3)
-                FROM ${layer}
+                SELECT MIN(nv1_ht)
+                FROM diemchuan_lopthuong
+            `
+
+        case '00LTHC00':
+            return `
+                SELECT MIN(nv1_ht)
+                FROM diemchuan_loptichhop
             `
 
         default:
             return `
-                SELECT MIN(nv1)
-                FROM ${layer}
+                SELECT MIN(nv1_ht)
+                FROM diemchuan_lopchuyen
             `
     }
+
 }
 const getSchoolName = (school) => {
     switch (school) {
         case undefined:
             return `
                 SELECT tentruong, diachi, trangweb, ST_AsGeoJSON(ST_Transform(geom, 4326)):: jsonb as json
-                FROM truongchuyen
-                UNION
-                SELECT tentruong, diachi, trangweb, ST_AsGeoJSON(ST_Transform(geom, 4326)):: jsonb as json
-                FROM truongthuong
+                FROM danhsachtruonghoc
             `
     
         default:
             return `
                 SELECT ST_AsGeoJSON(ST_Transform(geom, 4326)):: jsonb as json
-                FROM truongchuyen
-                WHERE vi_to_en(tentruong) = '${replace_regexp(convert_vi_to_en(school))}'
-                UNION
-                SELECT ST_AsGeoJSON(ST_Transform(geom, 4326)):: jsonb as json
-                FROM truongthuong
+                FROM danhsachtruonghoc
                 WHERE vi_to_en(tentruong) = '${replace_regexp(convert_vi_to_en(school))}'
             `
     }
 }
 const getLayerStatistic = (layer) => {
-    const layerJoined = join.statisticJoin(layer)
     return `
-        SELECT tentruong
-        FROM ${layerJoined}
+        SELECT b.tentruong
+        FROM ${layer} a
+        JOIN danhsachtruonghoc b
+        ON a.matruong = b.matruong
     `
 }
 const renderChart = ({layer, school}) => {  
-    const layerJoined = join.statisticJoin(layer)
     return `
         SELECT a.*, b.tentruong
         FROM ${layer} a
-        JOIN ${layerJoined} b
+        JOIN danhsachtruonghoc b
         ON a.matruong = b.matruong
         WHERE vi_to_en(b.tentruong) = '${replace_regexp(convert_vi_to_en(school))}'
     `
 }
 const advisingEnrollment = ({layer, distance, score, longitude, latitude}) => {
-    const layerJoined = join.scoreJoin(layer)
-    let whereScore = ''
-    let arrangeScore = ''
+    switch (layer) {
+        case '00LTKC00':
+            return `
+                SELECT a.matruong, a.nv1_ht, a.nv2_ht, a.nv3_ht, b.tentruong, c.ctieu_ht,
+                    ST_AsGeoJSON(ST_Intersection(b.geom, buffer))::json as pointJson, 
+                    ST_AsGeoJSON(buffer)::json as bufferJson
+                FROM 
+                    (SELECT ST_Buffer((ST_GeomFromText('POINT(${longitude} ${latitude})', 4326)::geography), ${distance})::Geometry as buffer) cliped, 
+                    diemchuan_lopthuong a
+                JOIN danhsachtruonghoc b ON a.matruong = b.matruong
+                JOIN chitieu_lopthuong c ON b.matruong = c.matruong
+                WHERE 
+                    a.maloaihinh = '${layer}'
+                    AND nv1_ht <= ${score}
+                GROUP BY a.matruong, a.nv1_ht, a.nv2_ht, a.nv3_ht, b.tentruong, b.geom, buffer, c.ctieu_ht
+                HAVING ST_AsGeoJSON(ST_Intersection(b.geom, buffer)) <> '{"type":"Point","coordinates":[]}'
+                ORDER BY a.nv1_ht DESC
+                LIMIT 20
+            `
 
-    switch (score) {
-        case '0':
-            whereScore = (layer == 'diemchuan_truongchuyen_lopthuong') 
-                ? `nv3 <= (SELECT MAX(nv3) FROM ${layer})` 
-                : `nv1 <= (SELECT MAX(nv1) FROM ${layer})`
-            arrangeScore = (layer == 'diemchuan_truongchuyen_lopthuong') 
-                ? `nv3 DESC` 
-                : `nv1 DESC`
-            break;
+        case '00LTHC00':
+            return `
+                SELECT a.matruong, a.nv1_ht, a.nv2_ht, b.tentruong, c.ctieu_ht,
+                    ST_AsGeoJSON(ST_Intersection(b.geom, buffer))::json as pointJson, 
+                    ST_AsGeoJSON(buffer)::json as bufferJson
+                FROM 
+                    (SELECT ST_Buffer((ST_GeomFromText('POINT(${longitude} ${latitude})', 4326)::geography), ${distance})::Geometry as buffer) cliped, 
+                    diemchuan_loptichhop a
+                JOIN danhsachtruonghoc b ON a.matruong = b.matruong
+                JOIN chitieu_loptichhop c ON b.matruong = c.matruong
+                WHERE 
+                    a.maloaihinh = '${layer}'
+                    AND nv1_ht <= ${score}
+                GROUP BY a.matruong, a.nv1_ht, a.nv2_ht, b.tentruong, b.geom, buffer, c.ctieu_ht
+                HAVING ST_AsGeoJSON(ST_Intersection(b.geom, buffer)) <> '{"type":"Point","coordinates":[]}'
+                ORDER BY a.nv1_ht DESC
+                LIMIT 20
+            `
 
         default:
-            whereScore = (layer == 'diemchuan_truongchuyen_lopthuong') 
-                ? `nv3 <= ${score}` 
-                : `nv1 <= ${score}`
-            arrangeScore = (layer == 'diemchuan_truongchuyen_lopthuong') 
-                ? `nv3 DESC` 
-                : `nv1 DESC`
-            break;
+            return `
+                SELECT a.matruong, a.nv1_ht, a.nv2_ht, b.tentruong, c.ctieu_ht,
+                    ST_AsGeoJSON(ST_Intersection(b.geom, buffer))::json as pointJson, 
+                    ST_AsGeoJSON(buffer)::json as bufferJson
+                FROM 
+                    (SELECT ST_Buffer((ST_GeomFromText('POINT(${longitude} ${latitude})', 4326)::geography), ${distance})::Geometry as buffer) cliped, 
+                    diemchuan_lopchuyen a
+                JOIN danhsachtruonghoc b ON a.matruong = b.matruong
+                JOIN chitieu_lopchuyen c ON b.matruong = c.matruong
+                WHERE 
+                    a.maloaihinh = '${layer}'
+                    AND nv1_ht <= ${score}
+                GROUP BY a.matruong, a.nv1_ht, a.nv2_ht, b.tentruong, b.geom, buffer, c.ctieu_ht
+                HAVING ST_AsGeoJSON(ST_Intersection(b.geom, buffer)) <> '{"type":"Point","coordinates":[]}'
+                ORDER BY a.nv1_ht DESC
+                LIMIT 20
+            `
     }
-
-    return `
-        SELECT a.*, 
-            ST_AsGeoJSON(ST_Intersection(b.geom, buffer))::json as pointJson, 
-            ST_AsGeoJSON(buffer)::json as bufferJson
-        FROM 
-            (SELECT ST_Buffer((ST_GeomFromText('POINT(${longitude} ${latitude})', 4326)::geography), ${distance})::Geometry as buffer) cliped, 
-            ${layer} a
-        JOIN ${layerJoined} b 
-        ON a.matruong = b.matruong
-        WHERE ${whereScore}
-        GROUP BY a.matruong, a.*, b.geom, buffer
-        HAVING ST_AsGeoJSON(ST_Intersection(b.geom, buffer)) <> '{"type":"Point","coordinates":[]}'
-        ORDER BY a.${arrangeScore}
-        LIMIT 20
-    `
 }
 
 module.exports = {

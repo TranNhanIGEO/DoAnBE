@@ -1,171 +1,215 @@
-const join = require('./layerJoin')
-
-const showData = (layer) => {
+const showSchool = () => {
     return `
-        SELECT *
-        FROM ${layer}
+        SELECT matruong, tentruong, diachi, trangweb
+        FROM danhsachtruonghoc
     `
 }
-const insertData = ({layer, type, id, name, address, web, long, lat}) => {
-    switch (layer) {
-        case 'truongthuong':
-            return `
-                INSERT INTO ${layer}(matruong, tentruong, diachi, trangweb, geom)
-                VALUES ('${id}', '${name}', '${address}', '${web}', 'SRID=4326; POINT(${long} ${lat})');
-                INSERT INTO chitieu_truongthuong(matruong)
-                VALUES ('${id}');
-                INSERT INTO diemchuan_truongthuong_lopthuong(matruong)
-                VALUES ('${id}');
-            `
-            
-        case 'truongcoloptichhop':
-            return `
-                INSERT INTO ${layer}(matruong, tentruong, diachi, trangweb, geom)
-                VALUES ('${id}', '${name}', '${address}', '${web}', 'SRID=4326; POINT(${long} ${lat})');
-                INSERT INTO chitieu_truongcoloptichhop(matruong)
-                VALUES ('${id}');
-                INSERT INTO diemchuan_truongco_loptichhop(matruong)
-                VALUES ('${id}');
-            `
-    
-        case 'truongchuyen':
-            let layers = ''
-            type.forEach(lyr => layers += `
-                INSERT INTO ${lyr}(matruong)
-                VALUES ('${id}');
-            `
-            )
-            return `
-                INSERT INTO ${layer}(matruong, tentruong, diachi, trangweb, geom)
-                VALUES ('${id}', '${name}', '${address}', '${web}', 'SRID=4326; POINT(${long} ${lat})');
-                INSERT INTO chitieu_truongchuyen(matruong)
-                VALUES ('${id}');
-            ` + layers
+const createSchool = ({layer, id, name, address, web, long, lat}) => {
+    let insertData = ''
+    let insertSchool = `
+            INSERT INTO danhsachtruonghoc(matruong, tentruong, maloaihinh, diachi, trangweb, geom)
+            VALUES ('${id}', '${name}', '{${layer}}', '${address}', '${web}', 'SRID=4326; POINT(${long} ${lat})');
+    `
+    if (layer.includes('00LTKC00')) {
+        insertData += `
+            INSERT INTO chitieu_lopthuong(matruong)
+            VALUES ('${id}');
+            INSERT INTO diemchuan_lopthuong(matruong, maloaihinh)
+            VALUES ('${id}', '00LTKC00');
+        `
+          }  
+    if (layer.includes('00LTHC00')) {
+        insertData += `
+            INSERT INTO chitieu_loptichhop(matruong)
+            VALUES ('${id}');
+            INSERT INTO diemchuan_loptichhop(matruong, maloaihinh)
+            VALUES ('${id}', '00LTHC00');
+        `
     }
+    const specialTypes = layer.filter((lyr) => (
+        lyr !== '00LTKC00' && lyr !== '00LTHC00'
+    ))
+    if (specialTypes.length) {
+        insertData += `
+            INSERT INTO chitieu_lopchuyen(matruong)
+            VALUES ('${id}');
+        `
+        insertData += specialTypes.map((lyr) => (`
+            INSERT INTO diemchuan_lopchuyen(matruong, maloaihinh)
+            VALUES ('${id}', '${lyr}');
+        `)).join('')
+    }
+    return insertSchool + insertData
 }
-const updateData = ({layer, id, name, address, web}) => {
+const updateSchool = ({id, name, address, web}) => {
     return `
-        UPDATE ${layer}
+        UPDATE danhsachtruonghoc
         SET tentruong = '${name}', diachi = '${address}', trangweb = '${web}'
         WHERE matruong = '${id}'
     `
 }
-const deleteData = ({layer, id}) => {
-    switch (layer) {
-        case 'truongthuong':
-            return `
-                DELETE FROM ${layer}
-                WHERE matruong = '${id}';
-                DELETE FROM chitieu_truongthuong
-                WHERE matruong = '${id}';
-                DELETE FROM diemchuan_truongthuong_lopthuong
-                WHERE matruong = '${id}';
-            `
-
-        case 'truongcoloptichhop':
-            return `
-                DELETE FROM ${layer}
-                WHERE matruong = '${id}';
-                DELETE FROM chitieu_truongcoloptichhop
-                WHERE matruong = '${id}';
-                DELETE FROM diemchuan_truongco_loptichhop
-                WHERE matruong = '${id}';
-            `
-    
-        default:
-            const types = [
-                "diemchuan_truongchuyen_lopthuong",
-                "diemchuan_truongchuyen_lopchuyen_anh",
-                "diemchuan_truongchuyen_lopchuyen_dia",
-                "diemchuan_truongchuyen_lopchuyen_hoa",
-                "diemchuan_truongchuyen_lopchuyen_ly",
-                "diemchuan_truongchuyen_lopchuyen_nhat",
-                "diemchuan_truongchuyen_lopchuyen_phap",
-                "diemchuan_truongchuyen_lopchuyen_sinh",
-                "diemchuan_truongchuyen_lopchuyen_su",
-                "diemchuan_truongchuyen_lopchuyen_tin",
-                "diemchuan_truongchuyen_lopchuyen_toan",
-                "diemchuan_truongchuyen_lopchuyen_trung",
-                "diemchuan_truongchuyen_lopchuyen_van"
-            ]
-            let layers = ''
-            types.forEach(lyr => layers += `
-                DELETE FROM ${lyr}
-                WHERE matruong = '${id}';
-            `)
-            return `
-                DELETE FROM ${layer}
-                WHERE matruong = '${id}';
-                DELETE FROM chitieu_truongchuyen
-                WHERE matruong = '${id}';
-            ` + layers
-    }
+const deleteSchool = ({id}) => {
+    return `
+        DELETE FROM danhsachtruonghoc
+        WHERE matruong = '${id}'
+    `
 }
 const showScore = (layer) => {
-    const layerJoined = join.scoreJoin(layer)
-    return `
-        SELECT a.*, b.tentruong
-        FROM ${layer} a
-        JOIN ${layerJoined} b
-        ON a.matruong = b.matruong
-    `
+    switch (layer) {
+        case '00LTKC00':
+            return `
+                SELECT a.*, b.tentruong
+                FROM diemchuan_lopthuong a
+                JOIN danhsachtruonghoc b
+                ON a.matruong = b.matruong
+                WHERE a.maloaihinh = '${layer}'
+            `
+        case '00LTHC00':
+            return `
+                SELECT a.*, b.tentruong
+                FROM diemchuan_loptichhop a
+                JOIN danhsachtruonghoc b
+                ON a.matruong = b.matruong
+                WHERE a.maloaihinh = '${layer}'
+            `
+        default:
+            return `
+                SELECT a.*, b.tentruong
+                FROM diemchuan_lopchuyen a
+                JOIN danhsachtruonghoc b
+                ON a.matruong = b.matruong
+                WHERE a.maloaihinh = '${layer}'
+            `
+    }
+}
+const createScore = ({layer, year}) => {
+    if (layer.includes('00LTKC00')) {
+        return `
+            ALTER TABLE diemchuan_lopthuong
+            DROP COLUMN nv1_2n;
+            ALTER TABLE diemchuan_lopthuong
+            DROP COLUMN nv2_2n;
+            ALTER TABLE diemchuan_lopthuong
+            DROP COLUMN nv3_2n;
+
+            ALTER TABLE diemchuan_lopthuong
+            RENAME COLUMN nv1_1n TO nv1_2n;
+            ALTER TABLE diemchuan_lopthuong
+            RENAME COLUMN nv2_1n TO nv2_2n;
+            ALTER TABLE diemchuan_lopthuong
+            RENAME COLUMN nv3_1n TO nv3_2n;
+
+            ALTER TABLE diemchuan_lopthuong
+            RENAME COLUMN nv1_ht TO nv1_1n;
+            ALTER TABLE diemchuan_lopthuong
+            RENAME COLUMN nv2_ht TO nv2_1n;
+            ALTER TABLE diemchuan_lopthuong
+            RENAME COLUMN nv3_ht TO nv3_1n;
+
+            ALTER TABLE diemchuan_lopthuong
+            ADD nv1_ht INT;
+            ALTER TABLE diemchuan_lopthuong
+            ADD nv2_ht INT;
+            ALTER TABLE diemchuan_lopthuong
+            ADD nv3_ht INT;
+
+            UPDATE diemchuan_lopthuong
+            SET namcapnhat = ${year};
+        `
+    }
+    if (layer.includes('00LTHC00')) {
+        return `
+            ALTER TABLE diemchuan_loptichhop
+            DROP COLUMN nv1_2n;
+            ALTER TABLE diemchuan_loptichhop
+            DROP COLUMN nv2_2n;
+
+            ALTER TABLE diemchuan_loptichhop
+            RENAME COLUMN nv1_1n TO nv1_2n;
+            ALTER TABLE diemchuan_loptichhop
+            RENAME COLUMN nv2_1n TO nv2_2n;
+
+            ALTER TABLE diemchuan_loptichhop
+            RENAME COLUMN nv1_ht TO nv1_1n;
+            ALTER TABLE diemchuan_loptichhop
+            RENAME COLUMN nv2_ht TO nv2_1n;
+
+            ALTER TABLE diemchuan_loptichhop
+            ADD nv1_ht INT;
+            ALTER TABLE diemchuan_loptichhop
+            ADD nv2_ht INT;
+
+            UPDATE diemchuan_loptichhop
+            SET namcapnhat = ${year};
+        `
+    }
+    const specialTypes = layer.filter((lyr) => (
+        lyr !== '00LTKC00' && lyr !== '00LTHC00'
+    ))
+    if (specialTypes.length) {
+        return `
+            ALTER TABLE diemchuan_lopchuyen
+            DROP COLUMN nv1_2n;
+            ALTER TABLE diemchuan_lopchuyen
+            DROP COLUMN nv2_2n;
+
+            ALTER TABLE diemchuan_lopchuyen
+            RENAME COLUMN nv1_1n TO nv1_2n;
+            ALTER TABLE diemchuan_lopchuyen
+            RENAME COLUMN nv2_1n TO nv2_2n;
+
+            ALTER TABLE diemchuan_lopchuyen
+            RENAME COLUMN nv1_ht TO nv1_1n;
+            ALTER TABLE diemchuan_lopchuyen
+            RENAME COLUMN nv2_ht TO nv2_1n;
+
+            ALTER TABLE diemchuan_lopchuyen
+            ADD nv1_ht INT;
+            ALTER TABLE diemchuan_lopchuyen
+            ADD nv2_ht INT;
+
+            UPDATE diemchuan_lopchuyen
+            SET namcapnhat = ${year};
+        `
+    }
 }
 const updateScore = (request, id) => {
     switch (request.layer) {
-        case 'diemchuan_truongthuong_lopthuong':
+        case '00LTKC00':
             return `
-                UPDATE ${request.layer}
-                SET chitieu = ${request.chitieu}, nv1 = ${request.nv1}, nv2 = ${request.nv2}, nv3 = ${request.nv3}
-                WHERE matruong = '${id}'
+                UPDATE diemchuan_lopthuong SET 
+                nv1_2n = ${request.nv1_2n}, nv2_2n = ${request.nv2_2n}, nv3_2n = ${request.nv3_2n}, 
+                nv1_1n = ${request.nv1_1n}, nv2_1n = ${request.nv2_1n}, nv3_1n = ${request.nv3_1n},
+                nv1_ht = ${request.nv1_ht}, nv2_ht = ${request.nv2_ht}, nv3_ht = ${request.nv3_ht}
+                WHERE matruong = '${id}' AND maloaihinh = '${request.layer}'
             `
 
-        case 'diemchuan_truongchuyen_lopthuong':
+        case '00LTHC00':
             return `
-                UPDATE ${request.layer}
-                SET chitieu = ${request.chitieu}, nv3 = ${request.nv3}, nv4 = ${request.nv4}
-                WHERE matruong = '${id}'
+                UPDATE diemchuan_loptichhop SET 
+                nv1_2n = ${request.nv1_2n}, nv2_2n = ${request.nv2_2n},
+                nv1_1n = ${request.nv1_1n}, nv2_1n = ${request.nv2_1n},
+                nv1_ht = ${request.nv1_ht}, nv2_ht = ${request.nv2_ht}
+                WHERE matruong = '${id}' AND maloaihinh = '${request.layer}'
             `
 
         default:
             return `
-                UPDATE ${request.layer}
-                SET chitieu = ${request.chitieu}, nv1 = ${request.nv1}, nv2 = ${request.nv2}
-                WHERE matruong = '${id}'
+                UPDATE diemchuan_lopchuyen SET 
+                nv1_2n = ${request.nv1_2n}, nv2_2n = ${request.nv2_2n},
+                nv1_1n = ${request.nv1_1n}, nv2_1n = ${request.nv2_1n},
+                nv1_ht = ${request.nv1_ht}, nv2_ht = ${request.nv2_ht}
+                WHERE matruong = '${id}' AND maloaihinh = '${request.layer}'
             `
     }
 }
-const showStatistic = ({layer, year, getYear}) => {
-    const currentDate = new Date()
-    const currentYear = currentDate.getFullYear()
-    const layerJoined = join.statisticJoin(layer)
-    const showCurrentYear = `
-        SELECT a.matruong, a.namht, a.ctieu_ht, a.slnv1_ht, b.tentruong
+const showStatistic = ({layer}) => {
+    return `
+        SELECT a.*, b.tentruong
         FROM ${layer} a
-        JOIN ${layerJoined} b
+        JOIN danhsachtruonghoc b
         ON a.matruong = b.matruong
     `
-    const showOneYearAgo = `
-        SELECT a.matruong, a.namht, a.ctieu_1n, a.slnv1_1n, b.tentruong
-        FROM ${layer} a
-        JOIN ${layerJoined} b
-        ON a.matruong = b.matruong
-    `
-    const showTwoYearAgo = `
-        SELECT a.matruong, a.namht, a.ctieu_2n, a.slnv1_2n, b.tentruong
-        FROM ${layer} a
-        JOIN ${layerJoined} b
-        ON a.matruong = b.matruong
-    `
-    if (getYear == currentYear) {
-        if (year == currentYear) {return showCurrentYear} 
-        else if (year == currentYear - 1) {return showOneYearAgo} 
-        else if (year == currentYear - 2) {return showTwoYearAgo}
-    }
-    else if (getYear != currentYear) {
-        if (year == currentYear - 1) {return showCurrentYear} 
-        else if (year == currentYear - 2) {return showOneYearAgo} 
-        else if (year == currentYear - 3) {return showTwoYearAgo}
-    }
 }
 const createStatistic = ({layer, year}) => {
     return `
@@ -186,46 +230,26 @@ const createStatistic = ({layer, year}) => {
         ALTER TABLE ${layer}
         ADD slnv1_ht INT;
         UPDATE ${layer}
-        SET namht = ${year};
+        SET namcapnhat = ${year};
     `
 }
-const updateStatistic = ({layer, id, year, getYear, target, registration}) => {
-    const currentDate = new Date()
-    const currentYear = currentDate.getFullYear()
-    const updateCurrentYear = `
-        UPDATE ${layer}
-        SET ctieu_ht = ${target}, slnv1_ht = ${registration}
+const updateStatistic = (request, id) => {
+    return `
+        UPDATE ${request.layer} SET 
+        ctieu_ht = ${request.ctieu_ht}, ctieu_1n = ${request.ctieu_1n}, ctieu_2n = ${request.ctieu_2n}, 
+        slnv1_ht = ${request.slnv1_ht}, slnv1_1n = ${request.slnv1_1n}, slnv1_2n = ${request.slnv1_2n}
         WHERE matruong = '${id}'
     `
-    const updateOneYearAgo = `
-        UPDATE ${layer}
-        SET ctieu_1n = ${target}, slnv1_1n = ${registration}
-        WHERE matruong = '${id}'
-    `
-    const updateTwoYearAgo = `
-        UPDATE ${layer}
-        SET ctieu_2n = ${target}, slnv1_2n = ${registration}
-        WHERE matruong = '${id}'
-    `
-    if (getYear == currentYear) {
-        if (year == currentYear) {return updateCurrentYear} 
-        else if (year == currentYear - 1) {return updateOneYearAgo} 
-        else if (year == currentYear - 2) {return updateTwoYearAgo}
-    }
-    else if (getYear != currentYear) {
-        if (year == currentYear - 1) {return updateCurrentYear} 
-        else if (year == currentYear - 2) {return updateOneYearAgo} 
-        else if (year == currentYear - 3) {return updateTwoYearAgo}
-    }
 }
 
 module.exports = {
-    showData,
-    insertData,
-    updateData,
-    deleteData,
+    showSchool,
+    createSchool,
+    updateSchool,
+    deleteSchool,
 
     showScore,
+    createScore,
     updateScore,
 
     showStatistic,

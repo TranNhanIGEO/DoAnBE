@@ -2,41 +2,46 @@ const pool = require('../../dbConfig')
 const query = require('../query/queryData')
 
 const DataController = {
-    showData(req, res) {
-        const layer = req.query.layer
-        pool.query(query.showData(layer), (error, result) => {
+    showSchool(req, res) {
+        pool.query(query.showSchool(), (error, result) => {
             if (error) throw error
             res.status(200).json(result.rows)
         })
     },
-    insertData(req, res) {
-        const {layer, type, id, name, address, web, long, lat} = req.body
-        pool.query(query.insertData({layer, type, id, name, address, web, long, lat}), (error, result) => {
+    createSchool(req, res) {
+        const {layer, id, name, address, web, long, lat} = req.body
+        pool.query(query.createSchool({layer, id, name, address, web, long, lat}), (error, result) => {
             if (error) throw error
             res.status(200).json(result)   
         })
     },
-    updateData(req, res) {
-        const {layer, name, address, web} = req.body
+    updateSchool(req, res) {
+        const {name, address, web} = req.body
         const id = req.params.id
-        pool.query(query.updateData({layer, id, name, address, web}), (error, result) => {
+        pool.query(query.updateSchool({id, name, address, web}), (error, result) => {
             if (error) throw error
             res.status(200).json(result)   
         })
     },
-    deleteData(req, res) {
-        const layer = req.query.layer
+    deleteSchool(req, res) {
         const id = req.params.id
-        pool.query(query.deleteData({layer, id}), (error, result) => {
+        pool.query(query.deleteSchool({id}), (error, result) => {
             if (error) throw error
             res.status(200).json(result)
         })
     },
     showScore(req, res) {
-        const layer = req.query.layer
+        const {layer} = req.query
         pool.query(query.showScore(layer), (error, result) => {
             if (error) throw error
             res.status(200).json(result.rows)   
+        })
+    },
+    createScore(req, res) {
+        const {layer, year} = req.body
+        pool.query(query.createScore({layer, year}), (error, result) => {
+            if (error) throw error
+            res.status(200).json(result)   
         })
     },
     updateScore(req, res) {
@@ -47,15 +52,11 @@ const DataController = {
         })
     },
     showStatistic(req, res) {
-        const {layer, year} = req.query
-        pool.query(`SELECT namht FROM ${layer}`, (error, result) => {
+        const {layer} = req.query
+        pool.query(query.showStatistic({layer}), (error, result) => {
             if (error) throw error
-            const getYear = result.rows[0].namht
-            pool.query(query.showStatistic({layer, year, getYear}), (error, result) => {
-                if (error) throw error
-                res.status(200).json(result.rows)
-            })   
-        })  
+            res.status(200).json(result.rows)
+        })   
     },
     createStatistic(req, res) {
         const {layer, year} = req.body
@@ -65,16 +66,11 @@ const DataController = {
         })
     },
     updateStatistic(req, res) {
-        const {layer, year, target, registration} = req.body
         const id = req.params.id
-        pool.query(`SELECT namht FROM ${layer}`, (error, result) => {
+        pool.query(query.updateStatistic(req.body, id), (error, result) => {
             if (error) throw error
-            const getYear = result.rows[0].namht
-            pool.query(query.updateStatistic({layer, id, year, getYear, target, registration}), (error, result) => {
-                if (error) throw error
-                res.status(200).json(result.rows)
-            })     
-        })     
+            res.status(200).json(result.rows)
+        })       
     }
 }
 
